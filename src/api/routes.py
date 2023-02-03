@@ -2,9 +2,11 @@ from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User
 from api.utils import generate_sitemap, APIException
 from flask_cors import CORS, cross_origin
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
 api = Blueprint('api', __name__)
 CORS(api)
+
 
 @api.route('/hello', methods=['POST', 'GET'])
 def handle_hello():
@@ -12,4 +14,55 @@ def handle_hello():
     response_body = jsonify(message="Simple server is running")
     response_body.headers.add("Access-Control-Allow-Origin", "*")
     return response_body, 200
+
+@api.route("/signup", methods=["POST"])
+@cross_origin()
+def signup():
+    if request.method == 'POST':
+        email = request.json.get('email', None)
+        password = request.json.get('password', None)
+
+        if not email:
+            return 'Email is required', 401
+        if not password:
+            return 'Password is required', 401
+
+        email_query = User.query.filter_by(email=email).first()
+        if email_query:
+            return 'This email already exists' , 402
+
+        user = User()
+        user.email = email
+        user.password = password
+        print(user)
+        db.session.add(user)
+        db.session.commit()
+
+        response = {
+            'msg': 'User added successfully',
+            'email': email
+        }
+        return jsonify(response), 200
+
+
+
+@api.route('/login', methods=['POST'])
+@cross_origin()
+def login():
+    if request.method == 'POST':
+        email = request.json.get('email', None)
+        password = request.json.get('password', None)
+        if not email:
+            return 'Email is required', 401
+        if not password:
+            return 'Password is required', 401
+
+    user = User.query.filter_by(email=email, password=password).first()
+    if user is None:
+        return 'error: This user was not found', 402
+    token = create_access_token(identity=user.id)
+    print(token)
+    return jsonify({
+        "message": "Successfully logged in.",
+        "token": token}), 200
 
